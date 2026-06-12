@@ -1,7 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 import { cloneConfig } from "../src/config";
 import { findMatchingTarget, applyFastModePayload, getFastModePayload, toModelRef } from "../src/payload";
-import { canSetTuiStatus, clearFastStatus, getStatusText, updateFastStatus } from "../src/status";
+import {
+  canSetTuiStatus,
+  clearFastStatus,
+  createFastIndicatorFactory,
+  getRightAlignedStatusLine,
+  getStatusText,
+  updateFastStatus,
+} from "../src/status";
 import { STATUS_KEY, type FastModeConfig } from "../src/types";
 
 const config: FastModeConfig = cloneConfig({
@@ -96,7 +103,40 @@ describe("status behavior", () => {
     expect(getStatusText(config, { provider: "openai", id: "gpt-5.5" })).toBeUndefined();
   });
 
-  it("updates and clears TUI footer status", () => {
+  it("right-aligns the widget line to the render width", () => {
+    expect(getRightAlignedStatusLine("fast", 10)).toBe("      fast");
+    expect(getRightAlignedStatusLine("fast", 4)).toBe("fast");
+    expect(getRightAlignedStatusLine("fast", 2)).toBe("fa");
+    expect(getRightAlignedStatusLine("fast", 0)).toBe("");
+
+    const component = createFastIndicatorFactory("fast")();
+    expect(component.render(8)).toEqual(["    fast"]);
+  });
+
+  it("uses a right-aligned below-editor widget when available", () => {
+    const setStatus = vi.fn();
+    const setWidget = vi.fn();
+    const ctx = { hasUI: true, mode: "tui", ui: { setStatus, setWidget } };
+
+    updateFastStatus(ctx, config, { provider: "openai", id: "gpt-5.4" });
+    clearFastStatus(ctx);
+
+    expect(setStatus).toHaveBeenNthCalledWith(1, STATUS_KEY, undefined);
+    expect(setWidget).toHaveBeenNthCalledWith(
+      1,
+      STATUS_KEY,
+      expect.any(Function),
+      { placement: "belowEditor" },
+    );
+    const factory = setWidget.mock.calls[0]?.[1];
+    expect((factory as Function)().render(10)).toEqual(["      fast"]);
+    expect(setStatus).toHaveBeenNthCalledWith(2, STATUS_KEY, undefined);
+    expect(setWidget).toHaveBeenNthCalledWith(2, STATUS_KEY, undefined, {
+      placement: "belowEditor",
+    });
+  });
+
+  it("falls back to the TUI footer status when widgets are unavailable", () => {
     const setStatus = vi.fn();
     const ctx = { hasUI: true, mode: "tui", ui: { setStatus } };
 

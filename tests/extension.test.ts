@@ -69,8 +69,31 @@ function makeCtx(
     ui: {
       notify: vi.fn(),
       setStatus: vi.fn(),
+      setWidget: vi.fn(),
     },
   };
+}
+
+type TestContext = ReturnType<typeof makeCtx>;
+
+function expectFastIndicatorShown(ctx: TestContext): void {
+  expect(ctx.ui.setStatus).toHaveBeenLastCalledWith(STATUS_KEY, undefined);
+  expect(ctx.ui.setWidget).toHaveBeenLastCalledWith(
+    STATUS_KEY,
+    expect.any(Function),
+    { placement: "belowEditor" },
+  );
+
+  const factory = ctx.ui.setWidget.mock.calls.at(-1)?.[1];
+  expect(factory).toBeTypeOf("function");
+  expect((factory as Function)().render(8)).toEqual(["    fast"]);
+}
+
+function expectFastIndicatorHidden(ctx: TestContext): void {
+  expect(ctx.ui.setStatus).toHaveBeenLastCalledWith(STATUS_KEY, undefined);
+  expect(ctx.ui.setWidget).toHaveBeenLastCalledWith(STATUS_KEY, undefined, {
+    placement: "belowEditor",
+  });
 }
 
 async function runHandler(
@@ -133,7 +156,7 @@ describe("piFastModeExtension runtime behavior", () => {
       ctx,
     );
 
-    expect(ctx.ui.setStatus).toHaveBeenLastCalledWith(STATUS_KEY, "fast");
+    expectFastIndicatorShown(ctx);
     expect(
       JSON.parse(await readFile(getUserConfigPath(agentDir), "utf8")),
     ).toMatchObject({
@@ -183,7 +206,7 @@ describe("piFastModeExtension runtime behavior", () => {
     ).toMatchObject({
       enabled: true,
     });
-    expect(ctx.ui.setStatus).toHaveBeenLastCalledWith(STATUS_KEY, "fast");
+    expectFastIndicatorShown(ctx);
 
     await commands.get("fast")!.handler("toggle", ctx);
     expect(
@@ -191,7 +214,7 @@ describe("piFastModeExtension runtime behavior", () => {
     ).toMatchObject({
       enabled: false,
     });
-    expect(ctx.ui.setStatus).toHaveBeenLastCalledWith(STATUS_KEY, undefined);
+    expectFastIndicatorHidden(ctx);
 
     await commands.get("fast")!.handler("on", ctx);
     expect(
@@ -199,7 +222,7 @@ describe("piFastModeExtension runtime behavior", () => {
     ).toMatchObject({
       enabled: true,
     });
-    expect(ctx.ui.setStatus).toHaveBeenLastCalledWith(STATUS_KEY, "fast");
+    expectFastIndicatorShown(ctx);
   });
 
   it("/fast off persists disabled state and hides status", async () => {
@@ -224,7 +247,7 @@ describe("piFastModeExtension runtime behavior", () => {
 
     await commands.get("fast")!.handler("off", ctx);
 
-    expect(ctx.ui.setStatus).toHaveBeenLastCalledWith(STATUS_KEY, undefined);
+    expectFastIndicatorHidden(ctx);
     expect(
       JSON.parse(await readFile(getUserConfigPath(agentDir), "utf8")),
     ).toMatchObject({
@@ -266,7 +289,7 @@ describe("piFastModeExtension runtime behavior", () => {
       "Usage: /fast [on|off|toggle]",
       "error",
     );
-    expect(ctx.ui.setStatus).toHaveBeenLastCalledWith(STATUS_KEY, undefined);
+    expectFastIndicatorHidden(ctx);
   });
 
   it("project-local package installs persist to project state instead of user state", async () => {
@@ -324,7 +347,11 @@ describe("piFastModeExtension runtime behavior", () => {
       { ...ctx, model: { provider: "openai", id: "gpt-4" } },
     );
 
-    expect(ctx.ui.setStatus).toHaveBeenCalledWith(STATUS_KEY, "fast");
-    expect(ctx.ui.setStatus).toHaveBeenLastCalledWith(STATUS_KEY, undefined);
+    expect(ctx.ui.setWidget).toHaveBeenCalledWith(
+      STATUS_KEY,
+      expect.any(Function),
+      { placement: "belowEditor" },
+    );
+    expectFastIndicatorHidden(ctx);
   });
 });

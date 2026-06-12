@@ -9,7 +9,7 @@ Pi package that adds a Fast Mode toggle for GPT-5.5 and GPT-5.4.
 - Registers `/fast [on|off|toggle]`.
 - Registers `--fast` to enable Fast Mode at startup.
 - Injects `service_tier: "priority"` into matching OpenAI/OpenAI-Codex provider payloads.
-- Shows a compact TUI footer status of `fast` only when enabled and the current model is configured.
+- Shows a compact right-aligned TUI `fast` indicator only when enabled and the current model is configured.
 - Persists state in user or project scope depending on how the package is loaded.
 
 ## Install
