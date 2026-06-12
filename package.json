@@ -1,0 +1,36 @@
+{
+  "name": "pi-openai-fast-mode",
+  "version": "0.1.0",
+  "description": "Pi extension package for toggling OpenAI Fast Mode priority inference",
+  "type": "module",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "openai",
+    "fast-mode"
+  ],
+  "files": [
+    "src",
+    "README.md",
+    "PRD.md"
+  ],
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run typecheck && npm test"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.0",
+    "vitest": "^4.0.0"
+  }
+}
