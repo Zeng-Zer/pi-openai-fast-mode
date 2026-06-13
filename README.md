@@ -12,6 +12,8 @@ Pi package that adds a Fast Mode toggle for GPT-5.5 and GPT-5.4.
 - Shows a compact right-aligned TUI `fast` indicator only when enabled and the current model is configured.
 - Persists state in user or project scope depending on how the package is loaded.
 
+> View on the [Pi Package Registry](https://pi.dev/packages/pi-openai-fast-mode)
+
 ## Install
 
 ```bash
