@@ -1,10 +1,14 @@
-import { mkdir, readFile, rm } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { mkdtemp } from "node:fs/promises";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createPiFastModeExtension } from "../src/index";
-import { getProjectConfigPath, getUserConfigPath } from "../src/config";
+import {
+  DEFAULT_CONFIG,
+  getProjectConfigPath,
+  getUserConfigPath,
+} from "../src/config";
 import { STATUS_KEY } from "../src/types";
 
 type FakePi = {
@@ -136,6 +140,46 @@ describe("piFastModeExtension registration", () => {
 });
 
 describe("piFastModeExtension runtime behavior", () => {
+  it("refreshes persisted targets on startup without changing enabled", async () => {
+    const root = await makeTempDir();
+    const cwd = join(root, "project");
+    const agentDir = join(root, "agent");
+    const configPath = getUserConfigPath(agentDir);
+    await mkdir(join(agentDir, "extensions", "pi-openai-fast-mode"), {
+      recursive: true,
+    });
+    await mkdir(cwd, { recursive: true });
+    await writeFile(
+      configPath,
+      JSON.stringify({
+        enabled: true,
+        targets: [
+          { provider: "openai", model: "old-model", serviceTier: "flex" },
+        ],
+      }),
+      "utf8",
+    );
+
+    const { pi, handlers } = createFakePi(false);
+    createPiFastModeExtension({
+      extensionDir: join(root, "global", "pi-openai-fast-mode", "src"),
+      agentDir,
+    })(pi as any);
+
+    const ctx = makeCtx(cwd, { provider: "openai", id: "gpt-5.4" });
+    await runHandler(
+      handlers,
+      "session_start",
+      { type: "session_start", reason: "startup" },
+      ctx,
+    );
+
+    expect(JSON.parse(await readFile(configPath, "utf8"))).toEqual({
+      enabled: true,
+      targets: DEFAULT_CONFIG.targets,
+    });
+  });
+
   it("--fast enables, persists, shows status, and mutates matching payloads", async () => {
     const root = await makeTempDir();
     const cwd = join(root, "project");

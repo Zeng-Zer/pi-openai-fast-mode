@@ -7,7 +7,12 @@ import type {
   ExtensionFactory,
 } from "@earendil-works/pi-coding-agent";
 import { getFastCommandCompletions, parseFastCommand } from "./commands";
-import { cloneConfig, loadConfigForScope, saveConfigToPath } from "./config";
+import {
+  cloneConfig,
+  loadConfigForScope,
+  saveConfigToPath,
+  syncSupportedTargets,
+} from "./config";
 import { getFastModePayload, toModelRef } from "./payload";
 import { clearFastStatus, updateFastStatus } from "./status";
 import type { FastModeConfig, ModelRef } from "./types";
@@ -51,9 +56,13 @@ export function createPiFastModeExtension(
         agentDir,
       });
 
-      config = loaded.config;
+      config = syncSupportedTargets(loaded.config);
       configPath = loaded.path;
       loadedCwd = ctx.cwd;
+
+      // Persist the package's current target list on every load so upgrades
+      // automatically update existing config files without changing enabled.
+      await saveConfigToPath(configPath, config);
     }
 
     async function ensureLoaded(

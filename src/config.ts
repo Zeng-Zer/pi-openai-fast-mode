@@ -89,6 +89,14 @@ export function cloneConfig(
   };
 }
 
+/** Keep the persisted toggle while replacing targets with this package's current list. */
+export function syncSupportedTargets(config: FastModeConfig): FastModeConfig {
+  return {
+    enabled: config.enabled,
+    targets: DEFAULT_CONFIG.targets.map(cloneTarget),
+  };
+}
+
 function normalizeTarget(rawTarget: unknown): FastTarget | undefined {
   if (!isRecord(rawTarget)) return undefined;
 

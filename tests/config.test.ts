@@ -14,6 +14,7 @@ import {
   parseConfigJson,
   saveConfigToPath,
   selectConfigPath,
+  syncSupportedTargets,
 } from "../src/config";
 
 const tempDirs: string[] = [];
@@ -70,6 +71,19 @@ describe("DEFAULT_CONFIG", () => {
 
     expect(DEFAULT_CONFIG.enabled).toBe(false);
     expect(DEFAULT_CONFIG.targets[0]!.model).toBe("gpt-5.4");
+  });
+});
+
+describe("syncSupportedTargets", () => {
+  it("uses the current package targets while preserving enabled", () => {
+    expect(
+      syncSupportedTargets({
+        enabled: true,
+        targets: [
+          { provider: "openai", model: "old-model", serviceTier: "flex" },
+        ],
+      }),
+    ).toEqual({ enabled: true, targets: DEFAULT_CONFIG.targets });
   });
 });
 
