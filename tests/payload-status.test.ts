@@ -21,6 +21,7 @@ const config: FastModeConfig = cloneConfig({
   targets: [
     { provider: "openai", model: "gpt-5.4", serviceTier: "priority" },
     { provider: "openai-codex", model: "gpt-5.5", serviceTier: "flex" },
+    { provider: "openai-codex", model: "gpt-5.6-sol", serviceTier: "priority" },
     { provider: "anthropic", model: "claude", serviceTier: "priority" },
   ],
 });
@@ -112,6 +113,16 @@ describe("payload mutation", () => {
         { a: 1 },
       ),
     ).toEqual({ a: 1, service_tier: "flex" });
+  });
+
+  it("matches configured GPT-5.6 models", () => {
+    expect(
+      getFastModePayload(
+        config,
+        { provider: "openai-codex", id: "gpt-5.6-sol" },
+        { a: 1 },
+      ),
+    ).toEqual({ a: 1, service_tier: "priority" });
   });
 
   it("does nothing when disabled", () => {
