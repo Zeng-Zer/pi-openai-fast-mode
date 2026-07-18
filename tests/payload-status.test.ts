@@ -1,3 +1,4 @@
+import { initTheme } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it, vi } from "vitest";
 import { cloneConfig } from "../src/config";
 import {
@@ -9,12 +10,12 @@ import {
 import {
   canSetTuiStatus,
   clearFastStatus,
-  createFastIndicatorFactory,
-  getRightAlignedStatusLine,
   getStatusText,
   updateFastStatus,
 } from "../src/status";
 import { STATUS_KEY, type FastModeConfig } from "../src/types";
+
+initTheme("dark", false);
 
 const config: FastModeConfig = cloneConfig({
   enabled: true,
@@ -125,6 +126,35 @@ describe("payload mutation", () => {
     ).toEqual({ a: 1, service_tier: "priority" });
   });
 
+  it("reroutes matching Plexus models to their hidden fast aliases", () => {
+    const plexusConfig: FastModeConfig = {
+      enabled: true,
+      targets: [
+        {
+          provider: "plexus",
+          model: "gpt-5.6-terra",
+          serviceTier: "priority",
+        },
+      ],
+    };
+
+    expect(
+      getFastModePayload(
+        plexusConfig,
+        { provider: "plexus", id: "gpt-5.6-terra" },
+        { model: "gpt-5.6-terra", a: 1 },
+      ),
+    ).toEqual({ model: "gpt-5.6-terra-fast", a: 1 });
+
+    expect(
+      getFastModePayload(
+        plexusConfig,
+        { provider: "plexus", id: "gpt-5.6-terra-fast" },
+        { model: "gpt-5.6-terra-fast", a: 1 },
+      ),
+    ).toEqual({ model: "gpt-5.6-terra-fast", a: 1 });
+  });
+
   it("does nothing when disabled", () => {
     expect(
       getFastModePayload(
@@ -168,40 +198,58 @@ describe("status behavior", () => {
     ).toBeUndefined();
   });
 
-  it("right-aligns the widget line to the render width", () => {
-    expect(getRightAlignedStatusLine("fast", 10)).toBe("      fast");
-    expect(getRightAlignedStatusLine("fast", 4)).toBe("fast");
-    expect(getRightAlignedStatusLine("fast", 2)).toBe("fa");
-    expect(getRightAlignedStatusLine("fast", 0)).toBe("");
-
-    const component = createFastIndicatorFactory("fast")();
-    expect(component.render(8)).toEqual(["    fast"]);
-  });
-
-  it("uses a right-aligned below-editor widget when available", () => {
+  it("appends fast to the model line without adding a status row", () => {
     const setStatus = vi.fn();
-    const setWidget = vi.fn();
-    const ctx = { hasUI: true, mode: "tui", ui: { setStatus, setWidget } };
+    const setFooter = vi.fn();
+    const ctx = {
+      hasUI: true,
+      mode: "tui",
+      model: {
+        provider: "openai",
+        id: "gpt-5.4",
+        reasoning: true,
+        contextWindow: 1_000_000,
+      },
+      modelRegistry: { isUsingOAuth: () => false },
+      sessionManager: {
+        getEntries: () => [],
+        getCwd: () => "/tmp/project",
+        getSessionName: () => undefined,
+      },
+      getContextUsage: () => ({
+        tokens: 0,
+        contextWindow: 1_000_000,
+        percent: 0,
+      }),
+      ui: { setStatus, setFooter },
+    };
 
-    updateFastStatus(ctx, config, { provider: "openai", id: "gpt-5.4" });
-    clearFastStatus(ctx);
-
-    expect(setStatus).toHaveBeenNthCalledWith(1, STATUS_KEY, undefined);
-    expect(setWidget).toHaveBeenNthCalledWith(
-      1,
-      STATUS_KEY,
-      expect.any(Function),
-      { placement: "belowEditor" },
+    const installed = updateFastStatus(
+      ctx,
+      config,
+      { provider: "openai", id: "gpt-5.4" },
+      () => "medium",
     );
-    const factory = setWidget.mock.calls[0]?.[1];
-    expect((factory as Function)().render(10)).toEqual(["      fast"]);
-    expect(setStatus).toHaveBeenNthCalledWith(2, STATUS_KEY, undefined);
-    expect(setWidget).toHaveBeenNthCalledWith(2, STATUS_KEY, undefined, {
-      placement: "belowEditor",
-    });
+    const factory = setFooter.mock.calls[0]?.[0];
+    const component = factory(
+      { requestRender: vi.fn() },
+      {},
+      {
+        getGitBranch: () => null,
+        getExtensionStatuses: () => new Map([["ponytail", "○ ponytail"]]),
+        getAvailableProviderCount: () => 1,
+        onBranchChange: () => () => {},
+      },
+    );
+    const lines = component.render(120);
+
+    expect(installed).toBe(true);
+    expect(setStatus).toHaveBeenCalledWith(STATUS_KEY, undefined);
+    expect(lines[1]).toContain("gpt-5.4 • medium • fast");
+    expect(lines[2]).toContain("○ ponytail");
   });
 
-  it("falls back to the TUI footer status when widgets are unavailable", () => {
+  it("falls back to a status row when custom footers are unavailable", () => {
     const setStatus = vi.fn();
     const ctx = { hasUI: true, mode: "tui", ui: { setStatus } };
 

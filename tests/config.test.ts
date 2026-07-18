@@ -32,32 +32,39 @@ afterEach(async () => {
 });
 
 describe("DEFAULT_CONFIG", () => {
-  it("starts disabled with exact OpenAI and OpenAI-Codex GPT-5.4/GPT-5.5/GPT-5.6 targets", () => {
+  it("starts disabled with GPT-5.4/5.5 and GPT-5.6-* targets", () => {
     expect(DEFAULT_CONFIG).toEqual({
       enabled: false,
       targets: [
         { provider: "openai", model: "gpt-5.4", serviceTier: "priority" },
         { provider: "openai", model: "gpt-5.5", serviceTier: "priority" },
         { provider: "openai", model: "gpt-5.6", serviceTier: "priority" },
-        { provider: "openai", model: "gpt-5.6-sol", serviceTier: "priority" },
-        { provider: "openai", model: "gpt-5.6-terra", serviceTier: "priority" },
-        { provider: "openai", model: "gpt-5.6-luna", serviceTier: "priority" },
+        { provider: "openai", model: "gpt-5.6-*", serviceTier: "priority" },
         { provider: "openai-codex", model: "gpt-5.4", serviceTier: "priority" },
         { provider: "openai-codex", model: "gpt-5.5", serviceTier: "priority" },
-        { provider: "openai-codex", model: "gpt-5.6", serviceTier: "priority" },
         {
           provider: "openai-codex",
+          model: "gpt-5.6",
+          serviceTier: "priority",
+        },
+        {
+          provider: "openai-codex",
+          model: "gpt-5.6-*",
+          serviceTier: "priority",
+        },
+        {
+          provider: "plexus",
+          model: "gpt-5.6-luna",
+          serviceTier: "priority",
+        },
+        {
+          provider: "plexus",
           model: "gpt-5.6-sol",
           serviceTier: "priority",
         },
         {
-          provider: "openai-codex",
+          provider: "plexus",
           model: "gpt-5.6-terra",
-          serviceTier: "priority",
-        },
-        {
-          provider: "openai-codex",
-          model: "gpt-5.6-luna",
           serviceTier: "priority",
         },
       ],
@@ -88,11 +95,11 @@ describe("syncSupportedTargets", () => {
 });
 
 describe("normalizeTargets", () => {
-  it("ignores invalid targets, unsupported providers, and duplicate provider/model pairs", () => {
+  it("accepts Plexus wildcard targets and ignores invalid targets", () => {
     expect(
       normalizeTargets([
-        { provider: "openai", model: "gpt-5.4" },
-        { provider: "openai", model: "gpt-5.4", serviceTier: "flex" },
+        { provider: "plexus", model: "gpt-5.6-*" },
+        { provider: "plexus", model: "gpt-5.6-*", serviceTier: "flex" },
         {
           provider: "openai-codex",
           model: " gpt-5.5 ",
@@ -104,7 +111,7 @@ describe("normalizeTargets", () => {
         null,
       ]),
     ).toEqual([
-      { provider: "openai", model: "gpt-5.4", serviceTier: "priority" },
+      { provider: "plexus", model: "gpt-5.6-*", serviceTier: "priority" },
       { provider: "openai-codex", model: "gpt-5.5", serviceTier: "priority" },
     ]);
   });

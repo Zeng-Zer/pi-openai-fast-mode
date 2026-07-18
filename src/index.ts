@@ -46,6 +46,7 @@ export function createPiFastModeExtension(
     let configPath: string | undefined;
     let loadedCwd: string | undefined;
     let currentModel: ModelRef | undefined;
+    let fastFooterInstalled = false;
 
     async function loadForContext(
       ctx: Pick<ExtensionContext, "cwd">,
@@ -109,7 +110,13 @@ export function createPiFastModeExtension(
           refreshCurrentModel(ctx);
           config.enabled = parseFastCommand(args, config.enabled);
           await saveCurrent(ctx);
-          updateFastStatus(ctx, config, currentModel);
+          fastFooterInstalled = updateFastStatus(
+            ctx,
+            config,
+            currentModel,
+            () => pi.getThinkingLevel(),
+            fastFooterInstalled,
+          );
         } catch (error) {
           notifyError(ctx, error);
         }
@@ -121,12 +128,31 @@ export function createPiFastModeExtension(
         currentModel = toModelRef(ctx.model);
         await loadForContext(ctx);
 
-        if (pi.getFlag("fast") === true) {
-          config.enabled = true;
-          await saveCurrent(ctx);
+        if (
+          currentModel?.provider === "plexus" &&
+          currentModel.id.endsWith("-fast")
+        ) {
+          const normalModel = ctx.modelRegistry.find(
+            "plexus",
+            currentModel.id.slice(0, -"-fast".length),
+          );
+          if (normalModel && (await pi.setModel(normalModel))) {
+            currentModel = toModelRef(normalModel);
+            config.enabled = true;
+          }
         }
 
-        updateFastStatus(ctx, config, currentModel);
+        if (_event.reason === "startup") config.enabled = false;
+        if (pi.getFlag("fast") === true) config.enabled = true;
+        await saveCurrent(ctx);
+
+        fastFooterInstalled = updateFastStatus(
+          ctx,
+          config,
+          currentModel,
+          () => pi.getThinkingLevel(),
+          fastFooterInstalled,
+        );
       } catch (error) {
         notifyError(ctx, error);
       }
@@ -134,7 +160,13 @@ export function createPiFastModeExtension(
 
     pi.on("model_select", async (event, ctx) => {
       currentModel = toModelRef(event.model) ?? toModelRef(ctx.model);
-      updateFastStatus(ctx, config, currentModel);
+      fastFooterInstalled = updateFastStatus(
+        ctx,
+        config,
+        currentModel,
+        () => pi.getThinkingLevel(),
+        fastFooterInstalled,
+      );
     });
 
     pi.on("before_provider_request", (event, ctx) => {
@@ -150,7 +182,8 @@ export function createPiFastModeExtension(
       } catch (error) {
         notifyError(ctx, error);
       } finally {
-        clearFastStatus(ctx);
+        clearFastStatus(ctx, fastFooterInstalled);
+        fastFooterInstalled = false;
       }
     });
   };

@@ -1,8 +1,8 @@
 export const PACKAGE_NAME = "pi-openai-fast-mode";
-export const STATUS_KEY = PACKAGE_NAME;
+export const STATUS_KEY = "model:fast";
 export const DEFAULT_SERVICE_TIER = "priority";
 
-export const SUPPORTED_PROVIDERS = ["openai", "openai-codex"] as const;
+export const SUPPORTED_PROVIDERS = ["openai", "openai-codex", "plexus"] as const;
 export type SupportedProvider = (typeof SUPPORTED_PROVIDERS)[number];
 
 export type FastTarget = {

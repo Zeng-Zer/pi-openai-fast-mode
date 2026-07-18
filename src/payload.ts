@@ -32,19 +32,34 @@ export function findMatchingTarget(
 ): FastTarget | undefined {
   if (!model || !isSupportedProvider(model.provider)) return undefined;
 
+  const modelId =
+    model.provider === "plexus" && model.id.endsWith("-fast")
+      ? model.id.slice(0, -"-fast".length)
+      : model.id;
+
   return targets.find(
     (target) =>
       target.provider === model.provider &&
-      target.model === model.id &&
-      isSupportedProvider(target.provider),
+      isSupportedProvider(target.provider) &&
+      (target.model.endsWith("*")
+        ? modelId.startsWith(target.model.slice(0, -1))
+        : target.model === modelId),
   );
 }
 
 export function applyFastModePayload(
   payload: unknown,
   serviceTier: string,
+  model?: ModelRef,
 ): unknown | undefined {
   if (!isRecord(payload)) return undefined;
+
+  if (model?.provider === "plexus") {
+    const baseModel = model.id.endsWith("-fast")
+      ? model.id.slice(0, -"-fast".length)
+      : model.id;
+    return { ...payload, model: `${baseModel}-fast` };
+  }
 
   return {
     ...payload,
@@ -65,5 +80,6 @@ export function getFastModePayload(
   return applyFastModePayload(
     payload,
     target.serviceTier ?? DEFAULT_SERVICE_TIER,
+    model,
   );
 }

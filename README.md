@@ -8,9 +8,11 @@ Pi package that adds a Fast Mode toggle for GPT-5.6, GPT-5.5, and GPT-5.4.
 
 - Registers `/fast [on|off|toggle]`.
 - Registers `--fast` to enable Fast Mode at startup.
-- Injects `service_tier: "priority"` into matching OpenAI/OpenAI-Codex provider payloads.
-- Shows a compact right-aligned TUI `fast` indicator only when enabled and the current model is configured.
-- Persists state in user or project scope depending on how the package is loaded.
+- Starts every new Pi process with Fast Mode disabled unless `--fast` is passed.
+- Injects `service_tier: "priority"` for direct OpenAI/OpenAI-Codex models.
+- Routes Plexus GPT-5.6 models to matching server-only `-fast` aliases.
+- Appends `• fast` to Pi's model/thinking footer when enabled and the current model is configured.
+- Persists state in user or project scope for reloads and session switches within the running process.
 
 > View on the [Pi Package Registry](https://pi.dev/packages/pi-openai-fast-mode)
 
@@ -37,7 +39,7 @@ pi -e ./src/index.ts
 /fast off      # disable
 ```
 
-Start Pi with Fast Mode enabled and persisted:
+Start Pi with Fast Mode enabled:
 
 ```bash
 pi --fast
@@ -86,7 +88,10 @@ Fast Mode starts disabled and only applies to exact configured provider/model pa
       "provider": "openai-codex",
       "model": "gpt-5.6-luna",
       "serviceTier": "priority"
-    }
+    },
+    { "provider": "plexus", "model": "gpt-5.6-luna", "serviceTier": "priority" },
+    { "provider": "plexus", "model": "gpt-5.6-sol", "serviceTier": "priority" },
+    { "provider": "plexus", "model": "gpt-5.6-terra", "serviceTier": "priority" }
   ]
 }
 ```

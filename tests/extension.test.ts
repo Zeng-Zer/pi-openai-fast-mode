@@ -15,6 +15,7 @@ type FakePi = {
   registerFlag: ReturnType<typeof vi.fn>;
   registerCommand: ReturnType<typeof vi.fn>;
   getFlag: ReturnType<typeof vi.fn>;
+  setModel: ReturnType<typeof vi.fn>;
   on: ReturnType<typeof vi.fn>;
 };
 
@@ -51,6 +52,7 @@ function createFakePi(fastFlag = false): {
       commands.set(name, options);
     }),
     getFlag: vi.fn((name: string) => (name === "fast" ? fastFlag : undefined)),
+    setModel: vi.fn(async () => true),
     on: vi.fn((event: string, handler: Function) => {
       const list = handlers.get(event) ?? [];
       list.push(handler);
@@ -70,10 +72,12 @@ function makeCtx(
     model,
     hasUI: true,
     mode: "tui",
+    modelRegistry: {
+      find: vi.fn(),
+    },
     ui: {
       notify: vi.fn(),
       setStatus: vi.fn(),
-      setWidget: vi.fn(),
     },
   };
 }
@@ -81,23 +85,11 @@ function makeCtx(
 type TestContext = ReturnType<typeof makeCtx>;
 
 function expectFastIndicatorShown(ctx: TestContext): void {
-  expect(ctx.ui.setStatus).toHaveBeenLastCalledWith(STATUS_KEY, undefined);
-  expect(ctx.ui.setWidget).toHaveBeenLastCalledWith(
-    STATUS_KEY,
-    expect.any(Function),
-    { placement: "belowEditor" },
-  );
-
-  const factory = ctx.ui.setWidget.mock.calls.at(-1)?.[1];
-  expect(factory).toBeTypeOf("function");
-  expect((factory as Function)().render(8)).toEqual(["    fast"]);
+  expect(ctx.ui.setStatus).toHaveBeenLastCalledWith(STATUS_KEY, "fast");
 }
 
 function expectFastIndicatorHidden(ctx: TestContext): void {
   expect(ctx.ui.setStatus).toHaveBeenLastCalledWith(STATUS_KEY, undefined);
-  expect(ctx.ui.setWidget).toHaveBeenLastCalledWith(STATUS_KEY, undefined, {
-    placement: "belowEditor",
-  });
 }
 
 async function runHandler(
@@ -140,7 +132,7 @@ describe("piFastModeExtension registration", () => {
 });
 
 describe("piFastModeExtension runtime behavior", () => {
-  it("refreshes persisted targets on startup without changing enabled", async () => {
+  it("refreshes persisted targets and starts each process disabled", async () => {
     const root = await makeTempDir();
     const cwd = join(root, "project");
     const agentDir = join(root, "agent");
@@ -175,9 +167,10 @@ describe("piFastModeExtension runtime behavior", () => {
     );
 
     expect(JSON.parse(await readFile(configPath, "utf8"))).toEqual({
-      enabled: true,
+      enabled: false,
       targets: DEFAULT_CONFIG.targets,
     });
+    expectFastIndicatorHidden(ctx);
   });
 
   it("--fast enables, persists, shows status, and mutates matching payloads", async () => {
@@ -192,7 +185,7 @@ describe("piFastModeExtension runtime behavior", () => {
       agentDir,
     })(pi as any);
 
-    const ctx = makeCtx(cwd, { provider: "openai", id: "gpt-5.4" });
+    const ctx = makeCtx(cwd, { provider: "plexus", id: "gpt-5.6-sol" });
     await runHandler(
       handlers,
       "session_start",
@@ -212,16 +205,52 @@ describe("piFastModeExtension runtime behavior", () => {
       "before_provider_request",
       {
         type: "before_provider_request",
-        payload: { model: "gpt-5.4", messages: [] },
+        payload: { model: "gpt-5.6-sol", input: [] },
       },
       ctx,
     );
 
     expect(mutated).toEqual({
-      model: "gpt-5.4",
-      messages: [],
-      service_tier: "priority",
+      model: "gpt-5.6-sol-fast",
+      input: [],
     });
+  });
+
+  it("hides a selected Plexus fast alias behind the normal model on reload", async () => {
+    const root = await makeTempDir();
+    const cwd = join(root, "project");
+    const agentDir = join(root, "agent");
+    await mkdir(cwd, { recursive: true });
+
+    const { pi, handlers } = createFakePi(false);
+    createPiFastModeExtension({
+      extensionDir: join(root, "global", "pi-openai-fast-mode", "src"),
+      agentDir,
+    })(pi as any);
+
+    const normalModel = { provider: "plexus", id: "gpt-5.6-sol" };
+    const ctx = makeCtx(cwd, {
+      provider: "plexus",
+      id: "gpt-5.6-sol-fast",
+    });
+    ctx.modelRegistry.find.mockReturnValue(normalModel);
+
+    await runHandler(
+      handlers,
+      "session_start",
+      { type: "session_start", reason: "reload" },
+      ctx,
+    );
+
+    expect(ctx.modelRegistry.find).toHaveBeenCalledWith(
+      "plexus",
+      "gpt-5.6-sol",
+    );
+    expect(pi.setModel).toHaveBeenCalledWith(normalModel);
+    expect(
+      JSON.parse(await readFile(getUserConfigPath(agentDir), "utf8")),
+    ).toMatchObject({ enabled: true });
+    expectFastIndicatorShown(ctx);
   });
 
   it("/fast, /fast on, and /fast toggle persist expected enabled states", async () => {
@@ -391,11 +420,7 @@ describe("piFastModeExtension runtime behavior", () => {
       { ...ctx, model: { provider: "openai", id: "gpt-4" } },
     );
 
-    expect(ctx.ui.setWidget).toHaveBeenCalledWith(
-      STATUS_KEY,
-      expect.any(Function),
-      { placement: "belowEditor" },
-    );
+    expect(ctx.ui.setStatus).toHaveBeenCalledWith(STATUS_KEY, "fast");
     expectFastIndicatorHidden(ctx);
   });
 });
